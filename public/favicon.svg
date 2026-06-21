@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#0a0a12" />
+  <!-- water pool -->
+  <rect x="6" y="46" width="52" height="12" rx="3" fill="#3d7ad6" />
+  <!-- sand heap -->
+  <path d="M14 46 L32 22 L50 46 Z" fill="#e2c275" />
+  <!-- falling grains -->
+  <rect x="30" y="8" width="4" height="4" rx="1" fill="#e2c275" />
+  <rect x="38" y="14" width="3" height="3" rx="1" fill="#e2c275" />
+  <rect x="23" y="16" width="3" height="3" rx="1" fill="#e2c275" />
+  <!-- ember -->
+  <circle cx="32" cy="40" r="3" fill="#ff7a18" />
+</svg>
