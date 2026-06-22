@@ -215,14 +215,15 @@ export function App() {
       </header>
 
       <div className="stage">
-        <div className="tank-shell">
-          <canvas
-            ref={canvasRef}
-            className={`stage__canvas ${backend === 'webgl2' ? 'stage__canvas--webgl' : ''}`}
-            width={GRID_W}
-            height={GRID_H}
-          />
-          <div className="tank-front-glass" />
+        <div className="room">
+          <div className="tank-shell">
+            <canvas
+              ref={canvasRef}
+              className={`stage__canvas ${backend === 'webgl2' ? 'stage__canvas--webgl' : ''}`}
+              width={GRID_W}
+              height={GRID_H}
+            />
+          </div>
         </div>
       </div>
 

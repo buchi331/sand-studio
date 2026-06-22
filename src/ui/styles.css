@@ -24,9 +24,9 @@ body,
 
 body {
   background:
-    linear-gradient(180deg, rgba(255, 247, 230, 0.02), rgba(28, 18, 12, 0.12)),
+    linear-gradient(180deg, rgba(8, 6, 12, 0.82), rgba(8, 6, 12, 0.9)),
     url('/room-aquarium-bg.png') center center / cover fixed,
-    #d3aa75;
+    #0e0b12;
   color: var(--text);
   font-family:
     system-ui,
@@ -107,30 +107,38 @@ body {
 .stage {
   flex: 1 1 auto;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 0 4px clamp(112px, 18vh, 168px);
+  padding: 8px 4px;
   position: relative;
-  perspective: none;
+}
+
+/* The room photo, locked to its own aspect ratio. The canvas is positioned
+   over the tank's interior as percentages of THIS box, so it stays aligned
+   inside the photographed tank on any screen size. */
+.room {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 941 / 1672;
+  margin: 0 auto;
+  background: url('/room-aquarium-bg.png') center / contain no-repeat;
 }
 
 .stage::before {
   content: none;
 }
 
+/* Canvas placed over the photographed tank interior (measured from the image:
+   inner walls x≈31%..73%, floor y≈80%). Bottom-aligned so contents rest on the
+   tank floor; height keeps the 9:16 grid aspect → headroom near the rim. */
 .tank-shell {
-  width: min(61vw, 552px);
-  height: min(58vh, 612px);
-  max-height: calc(100vh - 286px);
-  aspect-ratio: 0.73;
-  position: relative;
-  border-radius: 3px;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-  transform: none;
-  transform-style: flat;
+  position: absolute;
+  left: 31%;
+  top: 38%;
+  width: 42%;
+  height: 42%;
 }
 
 .tank-shell::before {
@@ -178,43 +186,14 @@ body {
 }
 
 .stage__canvas {
-  height: 100%;
-  max-width: 100%;
   width: 100%;
-  aspect-ratio: auto;
+  height: 100%;
   background: transparent;
   border: none;
-  border-radius: 2px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   touch-action: none;
   display: block;
-  position: relative;
-  z-index: 2;
-  box-shadow: none;
-  opacity: 1;
-  transform: none;
-}
-
-.tank-shell .stage__canvas::after {
-  content: none;
-}
-
-.tank-front-glass {
-  position: absolute;
-  inset: -2px -1px 0;
-  z-index: 3;
-  pointer-events: none;
-  border-radius: 3px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 10%, transparent 88%, rgba(190, 244, 255, 0.13)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.12)),
-    radial-gradient(ellipse at 15% 10%, rgba(255, 255, 255, 0.18), transparent 34%);
-  box-shadow:
-    inset 0 0 0 2px rgba(179, 239, 248, 0.34),
-    inset 10px 0 24px rgba(255, 255, 255, 0.12),
-    inset -10px 0 24px rgba(11, 67, 78, 0.16);
-  mix-blend-mode: screen;
 }
 
 .stage__canvas--webgl {
