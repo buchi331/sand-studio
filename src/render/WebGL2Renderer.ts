@@ -585,7 +585,8 @@ export class WebGL2Renderer implements Renderer {
           vec2 p = guv * uGridSize;
           float wave = sin(p.x * 0.22 + uTime * 1.4) * 0.5 + sin(p.x * 0.61 - uTime * 2.1) * 0.28 + sin((p.x + p.y) * 0.11 + uTime * 0.9) * 0.22;
           float surfaceLine = surface * exp(-pow((fract(p.y) - 0.22 - wave * 0.025) * 4.4, 2.0));
-          float shimmer = surface * smoothstep(0.8, 1.0, 0.5 + 0.5 * sin(p.x * 0.37 + uTime * 2.8 + wave));
+          float shimmer = surface * smoothstep(0.78, 1.0, 0.5 + 0.5 * sin(p.x * 0.37 + uTime * 2.8 + wave));
+          float glint = surface * pow(smoothstep(0.86, 1.0, 0.5 + 0.5 * sin(p.x * 0.8 - uTime * 3.5 + wave * 2.0)), 2.0);
 
           vec3 shallow = vec3(0.60, 0.74, 0.80);   // pale, near-clear (less cyan)
           vec3 deep = vec3(0.10, 0.24, 0.34);      // muted blue, low saturation
@@ -598,7 +599,8 @@ export class WebGL2Renderer implements Renderer {
           float shallowFloor = isSolid(floorId) * (1.0 - depth) * 0.92;
           water = mix(water, wetFloor * 0.8 + shallow * 0.2, shallowFloor);
           water += vec3(0.08, 0.14, 0.15) * surfaceLine;
-          water += vec3(0.12, 0.18, 0.18) * shimmer * 0.16;
+          water += vec3(0.14, 0.2, 0.2) * shimmer * 0.22;
+          water += vec3(0.62, 0.7, 0.72) * glint * 0.3;   // travelling window glint
           // warm reflection of the room's window light (upper-left) on the surface
           float winSide = smoothstep(0.75, 0.0, vUv.x);
           water += vec3(0.55, 0.48, 0.34) * surfaceLine * winSide;
@@ -684,6 +686,10 @@ export class WebGL2Renderer implements Renderer {
           c += vec3(0.012, 0.006, 0.0);
           float vig = smoothstep(1.05, 0.32, length(vUv - 0.5));
           c *= mix(0.9, 1.0, vig);
+          // Soft warm window-light wash from the upper-left, slowly breathing, so
+          // the contents bask in the same sun as the photographed room (見惚れる).
+          float beam = smoothstep(1.15, 0.0, length((vUv - vec2(0.08, 0.12)) * vec2(1.0, 0.85)));
+          c += vec3(0.11, 0.085, 0.05) * beam * (0.82 + 0.18 * sin(uTime * 0.5));
 
           // Per-pixel opacity: empty cells stay transparent so the photo tank
           // shows through; materials/water/glow become visible "inside" it.
