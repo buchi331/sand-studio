@@ -63,11 +63,23 @@ body {
   letter-spacing: 0.04em;
 }
 
+.app__badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .app__status {
   font-size: 11px;
   color: var(--text-dim);
   text-align: right;
   min-height: 14px;
+  flex: 1;
 }
 
 /* 9:16 stage */

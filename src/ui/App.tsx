@@ -26,6 +26,7 @@ export function App() {
   const [playing, setPlaying] = useState(true)
   const [recording, setRecording] = useState(false)
   const [status, setStatus] = useState('指でなぞって世界を描こう')
+  const [backend, setBackend] = useState('')
 
   // Mirror reactive state into refs so the rAF loop / pointer handlers always
   // read the latest values without re-subscribing every render.
@@ -49,8 +50,9 @@ export function App() {
 
     const seed = (Date.now() >>> 0) || 1
     const sim = new Simulation({ width: GRID_W, height: GRID_H, seed })
-    const { renderer } = createRenderer()
+    const { renderer, backend: rendererBackend } = createRenderer()
     renderer.init(canvas, GRID_W, GRID_H)
+    setBackend(rendererBackend)
     simRef.current = sim
     rendererRef.current = renderer
     recorderRef.current = new CanvasRecorder()
@@ -196,6 +198,11 @@ export function App() {
     <div className="app">
       <header className="app__header">
         <h1 className="app__title">落ち砂サンドボックス</h1>
+        {backend && (
+          <span className="app__badge" title="描画エンジン">
+            {backend === 'webgl2' ? 'WebGL2 ✨' : 'Canvas2D'}
+          </span>
+        )}
         <span className="app__status" aria-live="polite">
           {status}
         </span>

@@ -229,11 +229,11 @@ export class WebGL2Renderer implements Renderer {
         uniform vec2 uDir, uRes;
         void main(){
           vec2 px = uDir / uRes;
-          vec3 sum = texture2D(uTex, vUv).rgb * 0.227;
-          sum += texture2D(uTex, vUv + px * 1.5).rgb * 0.316;
-          sum += texture2D(uTex, vUv - px * 1.5).rgb * 0.316;
-          sum += texture2D(uTex, vUv + px * 3.5).rgb * 0.070;
-          sum += texture2D(uTex, vUv - px * 3.5).rgb * 0.070;
+          vec3 sum = texture2D(uTex, vUv).rgb * 0.204;
+          sum += texture2D(uTex, vUv + px * 1.4).rgb * 0.304;
+          sum += texture2D(uTex, vUv - px * 1.4).rgb * 0.304;
+          sum += texture2D(uTex, vUv + px * 3.3).rgb * 0.094;
+          sum += texture2D(uTex, vUv - px * 3.3).rgb * 0.094;
           gl_FragColor = vec4(sum, 1.0);
         }
       `
@@ -246,7 +246,7 @@ export class WebGL2Renderer implements Renderer {
       uniforms: {
         uScene: scene,
         uBloom: blurB,
-        uIntensity: 1.0
+        uIntensity: 2.5
       },
       vert: VERT,
       frag: `
