@@ -211,6 +211,9 @@ export function App() {
             {backend === 'webgl2' ? 'WebGL2 ✨' : 'Canvas2D'}
           </span>
         )}
+        <span className="app__badge" title="ビルド時刻">
+          {__APP_BUILD__}
+        </span>
         <span className="app__status" aria-live="polite">
           {status}
         </span>

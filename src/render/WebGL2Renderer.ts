@@ -461,19 +461,26 @@ export class WebGL2Renderer implements Renderer {
           float surfaceLine = surface * exp(-pow((fract(p.y) - 0.22 - wave * 0.025) * 4.4, 2.0));
           float shimmer = surface * smoothstep(0.8, 1.0, 0.5 + 0.5 * sin(p.x * 0.37 + uTime * 2.8 + wave));
 
-          vec3 shallow = vec3(0.42, 0.78, 0.88);
-          vec3 deep = vec3(0.04, 0.18, 0.34);
+          vec3 shallow = vec3(0.42, 0.80, 0.90);
+          vec3 deep = vec3(0.03, 0.16, 0.30);
           vec3 water = mix(shallow, deep, depth);
           float floorId = cellId(guv + vec2(0.0, t.y));
           vec3 floorCol = texture2D(uPalette, vec2((floorId + 0.5) / 9.0, 0.5)).rgb;
-          float shallowFloor = isSolid(floorId) * (1.0 - depth) * 0.8;
-          water = mix(water, floorCol * 0.86 + shallow * 0.14, shallowFloor);
-          water += vec3(0.07, 0.13, 0.14) * surfaceLine;
-          water += vec3(0.12, 0.18, 0.18) * shimmer * 0.12;
+          // wet sand seen through shallow water (darker, cooler than dry sand)
+          vec3 wetFloor = floorCol * 0.6;
+          wetFloor = mix(vec3(dot(wetFloor, vec3(0.33, 0.5, 0.17))), wetFloor, 1.2) + vec3(0.0, 0.02, 0.05);
+          float shallowFloor = isSolid(floorId) * (1.0 - depth) * 0.92;
+          water = mix(water, wetFloor * 0.8 + shallow * 0.2, shallowFloor);
+          water += vec3(0.08, 0.14, 0.15) * surfaceLine;
+          water += vec3(0.12, 0.18, 0.18) * shimmer * 0.16;
+          // warm reflection of the room's window light (upper-left) on the surface
+          float winSide = smoothstep(0.75, 0.0, vUv.x);
+          water += vec3(0.55, 0.48, 0.34) * surfaceLine * winSide;
 
-          // Blend the water film colour over the scene colour.
-          float waterMix = clamp(mask * (0.55 + depth * 0.3), 0.0, 0.92);
-          waterMix = max(waterMix, surfaceLine * 0.4);
+          // Blend the water body over the scene; shallow water stays translucent
+          // so the wet sand beneath reads through, deep water turns opaque teal.
+          float waterMix = clamp(mask * (0.5 + depth * 0.34), 0.0, 0.9);
+          waterMix = max(waterMix, surfaceLine * 0.45);
           c = mix(c, water, waterMix);
 
           // Caustics: a shifting bright network on solids that sit under water.

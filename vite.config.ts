@@ -3,10 +3,16 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Build stamp (MM-DD HH:MM) shown in the UI so it's obvious which deploy is live.
+const buildStamp = new Date().toISOString().slice(5, 16).replace('T', ' ')
+
 // base: './' so the build works when served from a GitHub Pages project
 // sub-path (https://<user>.github.io/sand-studio/) — all asset URLs stay relative.
 export default defineConfig({
   base: './',
+  define: {
+    __APP_BUILD__: JSON.stringify(buildStamp)
+  },
   plugins: [
     react(),
     VitePWA({

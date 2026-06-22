@@ -136,14 +136,13 @@ body {
 }
 
 /* Canvas placed over the photographed tank interior (calibrated from rendered
-   content vs the glass: inner walls x≈21%..76%, opening ≈21%, floor ≈74%).
-   Fills the tank; ~4% horizontal stretch from the grid is imperceptible. */
+   content vs the glass: inner walls x≈21%..78%, opening ≈21%, floor ≈75%). */
 .tank-shell {
   position: absolute;
   left: 21%;
   top: 21%;
-  width: 55%;
-  height: 53%;
+  width: 57%;
+  height: 54%;
 }
 
 .tank-shell::before {
