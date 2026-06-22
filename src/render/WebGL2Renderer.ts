@@ -184,10 +184,14 @@ export class WebGL2Renderer implements Renderer {
     }
     bgImg.src = `${import.meta.env.BASE_URL}room-aquarium-bg.png`
 
+    // depth:false + stencil:false → colour texture only. Without stencil:false
+    // regl attaches a stencil renderbuffer (needsStencil defaults true) that we
+    // never use and that throws "invalid render buffer format" on resize.
     const makeFbo = (w: number, h: number) =>
       regl.framebuffer({
         color: regl.texture({ width: w, height: h, type: fboType, mag: 'linear', min: 'linear' }),
-        depth: false
+        depth: false,
+        stencil: false
       })
     const scene = makeFbo(this.dw, this.dh)
     const bright = makeFbo(this.bw, this.bh)
@@ -205,7 +209,8 @@ export class WebGL2Renderer implements Renderer {
     this.fh = fh0
     const full = regl.framebuffer({
       color: regl.texture({ width: fw0, height: fh0, type: 'uint8', format: 'rgba', mag: 'linear', min: 'linear' }),
-      depth: false
+      depth: false,
+      stencil: false
     })
     this.full = full
 
@@ -476,6 +481,7 @@ export class WebGL2Renderer implements Renderer {
         uEmptyId: Material.Empty,
         uFireId: Material.Fire,
         uSteamId: Material.Steam,
+        uOilId: Material.Oil,
         uTime: regl.prop<{ uTime: number }, 'uTime'>('uTime'),
         uIntensity: 2.5,
         uBg: bgTex,
@@ -491,7 +497,7 @@ export class WebGL2Renderer implements Renderer {
         uniform float uHasBg;
         uniform vec2 uGridSize;
         uniform float uWaterId, uSandId, uStoneId, uWallId, uPlantId, uTime, uIntensity;
-        uniform float uEmptyId, uFireId, uSteamId;
+        uniform float uEmptyId, uFireId, uSteamId, uOilId;
         float cellId(vec2 uv) {
           return floor(texture2D(uGrid, uv).r * 255.0 + 0.5);
         }
@@ -541,8 +547,8 @@ export class WebGL2Renderer implements Renderer {
           float surfaceLine = surface * exp(-pow((fract(p.y) - 0.22 - wave * 0.025) * 4.4, 2.0));
           float shimmer = surface * smoothstep(0.8, 1.0, 0.5 + 0.5 * sin(p.x * 0.37 + uTime * 2.8 + wave));
 
-          vec3 shallow = vec3(0.42, 0.80, 0.90);
-          vec3 deep = vec3(0.03, 0.16, 0.30);
+          vec3 shallow = vec3(0.60, 0.74, 0.80);   // pale, near-clear (less cyan)
+          vec3 deep = vec3(0.10, 0.24, 0.34);      // muted blue, low saturation
           vec3 water = mix(shallow, deep, depth);
           float floorId = cellId(guv + vec2(0.0, t.y));
           vec3 floorCol = texture2D(uPalette, vec2((floorId + 0.5) / 9.0, 0.5)).rgb;
@@ -575,8 +581,8 @@ export class WebGL2Renderer implements Renderer {
 
           // Blend the water body over the scene; shallow water stays translucent
           // so the wet sand beneath reads through, deep water turns opaque teal.
-          float waterMix = clamp(mask * (0.5 + depth * 0.34), 0.0, 0.9);
-          waterMix = max(waterMix, surfaceLine * 0.45);
+          float waterMix = clamp(mask * (0.32 + depth * 0.32), 0.0, 0.72);
+          waterMix = max(waterMix, surfaceLine * 0.4);
           c = mix(c, water, waterMix);
 
           // Caustics: a shifting bright network on solids that sit under water.
@@ -644,14 +650,16 @@ export class WebGL2Renderer implements Renderer {
           float emptyHere = 1.0 - step(0.5, abs(id - uEmptyId));
           float fireHere = 1.0 - step(0.5, abs(id - uFireId));
           float steamHere = 1.0 - step(0.5, abs(id - uSteamId));
+          float oilHere = 1.0 - step(0.5, abs(id - uOilId));
           float waterHere = isWater(id);
 
           float outA = 0.0;
           outA = max(outA, solidCov);   // anti-aliased solid silhouette
+          outA = max(outA, oilHere);    // oil is an opaque body (was invisible)
           outA = max(outA, fireHere);
           outA = max(outA, steamHere * 0.82);
           // water cells + metaball spill onto neighbouring empty cells
-          float waterA = max(waterHere * (0.5 + depth * 0.28), mask * (0.32 + depth * 0.3));
+          float waterA = max(waterHere * (0.42 + depth * 0.3), mask * (0.28 + depth * 0.28));
           outA = max(outA, waterA);
           // keep the bloom glow visible over the transparent background
           float bloomA = clamp(dot(texture2D(uBloom, vUv).rgb * uIntensity, vec3(0.34)), 0.0, 1.0);
