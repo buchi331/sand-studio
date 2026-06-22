@@ -135,15 +135,14 @@ body {
   content: none;
 }
 
-/* Canvas placed over the photographed tank interior. Bottom aligned to the
-   FRONT lower rim of the glass (≈79%) so contents sit on the near edge of the
-   floor; inner walls x≈23%..75%, opening y≈26%. */
+/* Canvas placed over the photographed tank interior. Bottom sits just inside
+   the front lower rim of the glass (≈76%); inner walls x≈23%..75%, opening 26%. */
 .tank-shell {
   position: absolute;
   left: 23%;
   top: 26%;
   width: 52%;
-  height: 53%;
+  height: 50%;
 }
 
 .tank-shell::before {
