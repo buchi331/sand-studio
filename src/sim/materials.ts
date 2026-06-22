@@ -69,6 +69,21 @@ export const LIQUID_PARAMS: Partial<Record<MaterialId, LiquidParams>> = {
   [Material.Oil]: { dispersion: 2, flowChance: 0.4 }
 }
 
+/** How a material falls through air, so each element drops with its own feel. */
+export interface FallParams {
+  /** Chance it actually moves down when air is below. <1 = viscous, oozes slowly (oil トロッと). */
+  fallChance: number
+  /** Chance it drifts diagonally instead of straight while free-falling:
+   *  sand scatters loosely (さらさら), water trickles/drips (したたり), oil ≈0 (clumps). */
+  scatterChance: number
+}
+
+export const FALL_PARAMS: Partial<Record<MaterialId, FallParams>> = {
+  [Material.Sand]: { fallChance: 1.0, scatterChance: 0.3 },
+  [Material.Water]: { fallChance: 1.0, scatterChance: 0.35 },
+  [Material.Oil]: { fallChance: 0.5, scatterChance: 0.0 }
+}
+
 /** Frames a fresh flame burns before dying out. */
 export const FIRE_LIFE = 90
 /** Frames steam drifts before it condenses away. */

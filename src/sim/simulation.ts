@@ -1,4 +1,4 @@
-import { Material, LIQUID_PARAMS, FIRE_LIFE, STEAM_LIFE } from './materials'
+import { Material, LIQUID_PARAMS, FALL_PARAMS, FIRE_LIFE, STEAM_LIFE } from './materials'
 import { makeRng, type Rng } from './rng'
 
 export interface SimulationOptions {
@@ -189,6 +189,24 @@ export class Simulation {
     const m = this.cells[idx]
     const below = this.cellAt(x, y + 1)
     if (below !== OOB && this.canSink(m, below)) {
+      // Grains in a falling stream jostle and scatter sideways (さらさら). A lone
+      // grain (no powder above) keeps falling straight, so simple drops are
+      // unchanged. Only diagonal-into-air, so mass is still conserved by swap.
+      const fp = FALL_PARAMS[m as keyof typeof FALL_PARAMS]
+      if (
+        fp &&
+        below === Material.Empty &&
+        this.cellAt(x, y - 1) === m &&
+        this.rng() < fp.scatterChance
+      ) {
+        const sdir = this.rng() < 0.5 ? -1 : 1
+        for (const dx of [sdir, -sdir]) {
+          if (this.cellAt(x + dx, y + 1) === Material.Empty) {
+            this.swap(idx, this.index(x + dx, y + 1))
+            return
+          }
+        }
+      }
       this.swap(idx, this.index(x, y + 1))
       return
     }
@@ -206,6 +224,21 @@ export class Simulation {
     const m = this.cells[idx]
     const below = this.cellAt(x, y + 1)
     if (below !== OOB && this.canSink(m, below)) {
+      const fp = FALL_PARAMS[m as keyof typeof FALL_PARAMS]
+      if (fp && below === Material.Empty) {
+        // Viscous liquids ooze: skip some downward steps so oil falls slowly (トロッと).
+        if (fp.fallChance < 1 && this.rng() >= fp.fallChance) return
+        // Runny liquids trickle: drift diagonally while free-falling (water したたり).
+        if (fp.scatterChance > 0 && this.rng() < fp.scatterChance) {
+          const sdir = this.rng() < 0.5 ? -1 : 1
+          for (const dx of [sdir, -sdir]) {
+            if (this.cellAt(x + dx, y + 1) === Material.Empty) {
+              this.swap(idx, this.index(x + dx, y + 1))
+              return
+            }
+          }
+        }
+      }
       this.swap(idx, this.index(x, y + 1))
       return
     }

@@ -140,6 +140,55 @@ describe('Liquid physics', () => {
   })
 })
 
+describe('Per-material falling feel', () => {
+  it('oil falls slower than water (viscous ooze)', () => {
+    const lowestAfter = (mat: number) => {
+      const sim = new Simulation({ width: 5, height: 40, seed: 5 })
+      for (let i = 0; i < 8; i++) sim.set(2, i, mat) // a short column at the top
+      for (let i = 0; i < 12; i++) sim.step()
+      let lowest = 0
+      for (let y = 0; y < 40; y++)
+        for (let x = 0; x < 5; x++) if (sim.get(x, y) === mat) lowest = Math.max(lowest, y)
+      return lowest
+    }
+    expect(lowestAfter(Material.Water)).toBeGreaterThan(lowestAfter(Material.Oil))
+  })
+
+  it('a fed sand stream scatters wider than its 1-cell source', () => {
+    const sim = new Simulation({ width: 21, height: 30, seed: 9 })
+    for (let i = 0; i < 26; i++) {
+      sim.set(10, 0, Material.Sand) // keep feeding from a single column
+      sim.step()
+    }
+    let minX = 99
+    let maxX = -1
+    for (let y = 4; y < 22; y++)
+      for (let x = 0; x < 21; x++)
+        if (sim.get(x, y) === Material.Sand) {
+          minX = Math.min(minX, x)
+          maxX = Math.max(maxX, x)
+        }
+    expect(maxX - minX).toBeGreaterThan(0) // spread beyond the single source column
+  })
+
+  it('keeps determinism with the new fall behaviour', () => {
+    const build = () => {
+      const sim = new Simulation({ width: 16, height: 24, seed: 99 })
+      sim.paint(8, 1, Material.Sand, 3)
+      sim.paint(4, 1, Material.Water, 2)
+      sim.paint(11, 1, Material.Oil, 2)
+      return sim
+    }
+    const a = build()
+    const b = build()
+    for (let i = 0; i < 80; i++) {
+      a.step()
+      b.step()
+    }
+    expect(Array.from(a.cells)).toEqual(Array.from(b.cells))
+  })
+})
+
 describe('Reactions', () => {
   it('fire spreads to adjacent plant', () => {
     const sim = new Simulation({ width: 5, height: 5, seed: 7 })

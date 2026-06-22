@@ -655,7 +655,7 @@ export class WebGL2Renderer implements Renderer {
 
           float outA = 0.0;
           outA = max(outA, solidCov);   // anti-aliased solid silhouette
-          outA = max(outA, oilHere);    // oil is an opaque body (was invisible)
+          outA = max(outA, oilHere * 0.72);   // oil is a translucent, glossy film
           outA = max(outA, fireHere);
           outA = max(outA, steamHere * 0.82);
           // water cells + metaball spill onto neighbouring empty cells

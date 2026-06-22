@@ -138,10 +138,16 @@ export class Canvas2DRenderer implements Renderer {
       buf[o] = r
       buf[o + 1] = g
       buf[o + 2] = b
-      // Empty stays transparent so the photo aquarium shows through; water is
-      // semi-transparent (glassy); everything else is opaque.
+      // Empty stays transparent so the photo aquarium shows through; water and
+      // oil are semi-transparent (glassy / oily film); everything else is opaque.
       buf[o + 3] =
-        m === Material.Empty ? 0 : m === Material.Water ? 190 : 255
+        m === Material.Empty
+          ? 0
+          : m === Material.Water
+            ? 190
+            : m === Material.Oil
+              ? 200
+              : 255
     }
 
     ctx.putImageData(image, 0, 0)
