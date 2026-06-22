@@ -3,6 +3,7 @@ import { Simulation } from '../sim/simulation'
 import { Material } from '../sim/materials'
 import { createRenderer } from '../render/createRenderer'
 import type { Renderer } from '../render/Renderer'
+import { renderFrame } from '../render/frame'
 import { CanvasRecorder, shareVideo } from '../capture/recorder'
 import { Palette } from './Palette'
 import { Toolbar } from './Toolbar'
@@ -75,9 +76,14 @@ export function App() {
     ro.observe(canvas)
 
     let raf = 0
-    const loop = () => {
-      if (playingRef.current) sim.step()
-      renderer.render(sim)
+    const loop = (now: number) => {
+      renderFrame({
+        sim,
+        renderer,
+        grid: sim,
+        playing: playingRef.current,
+        nowMs: now
+      })
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -209,12 +215,15 @@ export function App() {
       </header>
 
       <div className="stage">
-        <canvas
-          ref={canvasRef}
-          className="stage__canvas"
-          width={GRID_W}
-          height={GRID_H}
-        />
+        <div className="tank-shell">
+          <canvas
+            ref={canvasRef}
+            className={`stage__canvas ${backend === 'webgl2' ? 'stage__canvas--webgl' : ''}`}
+            width={GRID_W}
+            height={GRID_H}
+          />
+          <div className="tank-front-glass" />
+        </div>
       </div>
 
       <Palette tool={tool} onSelect={setTool} />

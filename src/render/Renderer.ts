@@ -21,7 +21,7 @@ export interface Renderer {
   /** Notify the renderer the display size (CSS px * dpr) changed. */
   resize(displayWidth: number, displayHeight: number, dpr: number): void
   /** Draw the current grid state to the bound canvas. */
-  render(grid: GridView): void
+  render(grid: GridView, elapsedSeconds?: number): void
   /** Release GPU/CPU resources. */
   dispose(): void
 }

@@ -30,7 +30,7 @@ export class Canvas2DRenderer implements Renderer {
   init(canvas: HTMLCanvasElement, width: number, height: number): void {
     canvas.width = width
     canvas.height = height
-    const ctx = canvas.getContext('2d', { alpha: false })
+    const ctx = canvas.getContext('2d', { alpha: true })
     if (!ctx) throw new Error('2D canvas context is unavailable')
     ctx.imageSmoothingEnabled = false
     this.ctx = ctx
@@ -70,6 +70,19 @@ export class Canvas2DRenderer implements Renderer {
         r = v
         g = v
         b = clamp8(v + 8)
+      } else if (m === Material.Water) {
+        const above = i - w
+        const below = i + w
+        const left = i % w === 0 ? -1 : i - 1
+        const right = i % w === w - 1 ? -1 : i + 1
+        const isSurface = above < 0 || cells[above] !== Material.Water
+        const deep = below < cells.length && cells[below] === Material.Water
+        const edge =
+          (left >= 0 && cells[left] !== Material.Water) ||
+          (right >= 0 && cells[right] !== Material.Water)
+        r = clamp8(r + (isSurface ? 48 : deep ? -24 : 8) + (edge ? 12 : 0))
+        g = clamp8(g + (isSurface ? 58 : deep ? -16 : 14) + (edge ? 18 : 0))
+        b = clamp8(b + (isSurface ? 44 : deep ? 12 : 22) + (edge ? 24 : 0))
       } else {
         const amp = VARIATION[m] ?? 0
         if (amp > 0) {
@@ -88,7 +101,10 @@ export class Canvas2DRenderer implements Renderer {
       buf[o] = r
       buf[o + 1] = g
       buf[o + 2] = b
-      buf[o + 3] = 255
+      // Empty stays transparent so the photo aquarium shows through; water is
+      // semi-transparent (glassy); everything else is opaque.
+      buf[o + 3] =
+        m === Material.Empty ? 0 : m === Material.Water ? 190 : 255
     }
 
     ctx.putImageData(image, 0, 0)
