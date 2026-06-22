@@ -311,6 +311,11 @@ export class WebGL2Renderer implements Renderer {
             float foam = edgeSolid * (solidUnder * 0.86 + sideEdge * 0.08) * foamNoise * 0.18 * coverage;
             col = mix(col, vec3(0.86, 0.94, 0.98), foam);
           } else if (id > 0.5 && abs(id - uWaterId) > 0.5) {
+            // faux volume: lit from above — exposed (surface) cells brighter,
+            // buried cells slightly darker, so piles read as 3D mounds.
+            float aboveSame = 1.0 - step(0.5, abs(cellId(uv - vec2(0.0, texel.y)) - id));
+            float belowSame = 1.0 - step(0.5, abs(cellId(uv + vec2(0.0, texel.y)) - id));
+            col *= 1.0 + (1.0 - aboveSame) * 0.20 - belowSame * 0.05;
             col += (hash(c) * 2.0 - 1.0) * pal.a;              // per-material grain
           }
           gl_FragColor = vec4(col, 1.0);
@@ -460,6 +465,12 @@ export class WebGL2Renderer implements Renderer {
           float waterMix = clamp(mask * (0.55 + depth * 0.3), 0.0, 0.92);
           waterMix = max(waterMix, surfaceLine * 0.4);
           c = mix(c, water, waterMix);
+
+          // Faux depth: ambient occlusion toward the tank glass (canvas edges)
+          // and floor, so the contents read as sitting inside a 3D tank.
+          float aoX = min(smoothstep(0.0, 0.09, vUv.x), smoothstep(0.0, 0.09, 1.0 - vUv.x));
+          float aoFloor = smoothstep(0.0, 0.10, vUv.y);
+          c *= mix(0.80, 1.0, aoX) * mix(0.86, 1.0, aoFloor);
 
           // Per-pixel opacity: empty cells stay transparent so the photo tank
           // shows through; materials/water/glow become visible "inside" it.
