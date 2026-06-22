@@ -6,6 +6,7 @@ export interface GridView {
   readonly width: number
   readonly height: number
   readonly cells: Uint8Array
+  readonly life: Uint8Array
 }
 
 /**
@@ -17,6 +18,8 @@ export interface GridView {
 export interface Renderer {
   /** Bind to a canvas and size internal buffers to the grid resolution. */
   init(canvas: HTMLCanvasElement, width: number, height: number): void
+  /** Notify the renderer the display size (CSS px * dpr) changed. */
+  resize(displayWidth: number, displayHeight: number, dpr: number): void
   /** Draw the current grid state to the bound canvas. */
   render(grid: GridView): void
   /** Release GPU/CPU resources. */

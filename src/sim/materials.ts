@@ -68,3 +68,27 @@ export const LIQUID_PARAMS: Partial<Record<MaterialId, LiquidParams>> = {
   [Material.Water]: { dispersion: 6, flowChance: 1.0 },
   [Material.Oil]: { dispersion: 2, flowChance: 0.4 }
 }
+
+/** Frames a fresh flame burns before dying out. */
+export const FIRE_LIFE = 90
+/** Frames steam drifts before it condenses away. */
+export const STEAM_LIFE = 70
+
+/** Materials that emit light (drive the bloom pass). */
+export const EMISSIVE: ReadonlySet<MaterialId> = new Set([
+  Material.Fire,
+  Material.Steam
+])
+
+/** Per-material brightness-variation amplitude (0..1), indexed by material id. */
+export const VARIATION: ReadonlyArray<number> = [
+  0, // Empty
+  0.04, // Wall
+  0.16, // Sand   — strong grain texture
+  0.06, // Water
+  0.1, // Oil
+  0.12, // Plant
+  0, // Fire   — colour comes from life, not variation
+  0.1, // Stone
+  0 // Steam  — colour comes from life
+]

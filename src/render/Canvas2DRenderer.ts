@@ -38,6 +38,9 @@ export class Canvas2DRenderer implements Renderer {
     this.buffer = this.image.data
   }
 
+  // Canvas2D renders at grid resolution and is CSS-scaled, so display size is irrelevant.
+  resize(): void {}
+
   render(grid: GridView): void {
     const ctx = this.ctx
     const image = this.image

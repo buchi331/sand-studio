@@ -1,4 +1,4 @@
-import { Material, LIQUID_PARAMS } from './materials'
+import { Material, LIQUID_PARAMS, FIRE_LIFE, STEAM_LIFE } from './materials'
 import { makeRng, type Rng } from './rng'
 
 export interface SimulationOptions {
@@ -10,10 +10,6 @@ export interface SimulationOptions {
 
 const OOB = -1
 
-/** Frames a fresh flame burns before dying out. */
-const FIRE_LIFE = 90
-/** Frames steam drifts before it condenses away. */
-const STEAM_LIFE = 70
 /** Per-step chance a flame ignites an adjacent flammable cell. */
 const FIRE_SPREAD = 0.28
 /** Per-step chance a flame flickers upward into empty space. */
@@ -66,7 +62,7 @@ export class Simulation {
   readonly width: number
   readonly height: number
   readonly cells: Uint8Array
-  private readonly life: Uint8Array
+  readonly life: Uint8Array
   private readonly moved: Uint8Array
   private rng: Rng
   private readonly seed: number
