@@ -1,4 +1,4 @@
-import { COLORS, Material } from '../sim/materials'
+import { COLORS, Material, VARIATION, FIRE_LIFE, STEAM_LIFE } from '../sim/materials'
 import type { GridView, Renderer } from './Renderer'
 
 function hash(n: number): number {
@@ -18,14 +18,14 @@ function clamp8(v: number): number {
 /**
  * CPU renderer: builds an `ImageData` at grid resolution and blits it with
  * `putImageData`. The canvas backing store is the grid size; CSS scales it up
- * with `image-rendering: pixelated` for crisp pixels. Fire and steam get a
- * cheap per-frame flicker so the world feels alive even when paused logic-wise.
+ * with `image-rendering: pixelated` for crisp pixels. Colours come from the
+ * shared palette: powders/solids get stable per-cell grain (VARIATION), fire is
+ * coloured by its life (temperature), steam fades as it dissipates.
  */
 export class Canvas2DRenderer implements Renderer {
   private ctx: CanvasRenderingContext2D | null = null
   private image: ImageData | null = null
   private buffer: Uint8ClampedArray | null = null
-  private frame = 0
 
   init(canvas: HTMLCanvasElement, width: number, height: number): void {
     canvas.width = width
@@ -47,9 +47,9 @@ export class Canvas2DRenderer implements Renderer {
     const buf = this.buffer
     if (!ctx || !image || !buf) return
 
-    this.frame = (this.frame + 1) & 0xffff
-    const f = this.frame
     const cells = grid.cells
+    const life = grid.life
+    const w = grid.width
 
     for (let i = 0; i < cells.length; i++) {
       const m = cells[i]
@@ -59,14 +59,29 @@ export class Canvas2DRenderer implements Renderer {
       let b = color[2]
 
       if (m === Material.Fire) {
-        const flick = (hash(i * 7 + f * 13) % 70) - 25
-        r = clamp8(r + flick)
-        g = clamp8(g + (flick >> 1))
+        // temperature: hot core (high life) -> white, cooling -> deep red
+        const t = Math.min(1, life[i] / FIRE_LIFE)
+        r = 255
+        g = clamp8(70 + t * 170)
+        b = clamp8(t * t * 90)
       } else if (m === Material.Steam) {
-        const flick = (hash(i * 5 + f) % 36) - 18
-        r = clamp8(r + flick)
-        g = clamp8(g + flick)
-        b = clamp8(b + flick)
+        const t = Math.min(1, life[i] / STEAM_LIFE)
+        const v = clamp8(150 + t * 70)
+        r = v
+        g = v
+        b = clamp8(v + 8)
+      } else {
+        const amp = VARIATION[m] ?? 0
+        if (amp > 0) {
+          // stable per-cell grain from a coordinate hash, in [-1, 1]
+          const x = i % w
+          const y = (i / w) | 0
+          const n = ((hash((x * 73856093) ^ (y * 19349663)) & 0xff) / 255) * 2 - 1
+          const d = n * amp * 255
+          r = clamp8(r + d)
+          g = clamp8(g + d)
+          b = clamp8(b + d)
+        }
       }
 
       const o = i << 2
