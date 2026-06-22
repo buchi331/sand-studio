@@ -63,7 +63,9 @@ export function App() {
       // environments where requestAnimationFrame does not fire).
       ;(window as unknown as Record<string, unknown>).__sand = {
         render: () => renderer.render(sim),
-        sim
+        sim,
+        renderer,
+        backend: rendererBackend
       }
     }
 

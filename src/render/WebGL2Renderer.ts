@@ -501,6 +501,27 @@ export class WebGL2Renderer implements Renderer {
           float smoke = clamp(fireBelow, 0.0, 1.0) * smokeNoise * emptyHereS * 0.5;
           c += vec3(0.05, 0.045, 0.04) * smoke;
 
+          // Edge anti-alias: round + soften the solid silhouette so piles stop
+          // reading as hard square pixels against the photo. A tight metaball
+          // field dilates the outline by <half a cell; the material colour is
+          // bled outward from the nearest solid neighbour (no dark fringe).
+          vec2 f = fract(guv * uGridSize);
+          float sC = isSolid(id);
+          float sL = isSolid(cellId(guv - vec2(t.x, 0.0)));
+          float sR = isSolid(cellId(guv + vec2(t.x, 0.0)));
+          float sU = isSolid(cellId(guv - vec2(0.0, t.y)));
+          float sD = isSolid(cellId(guv + vec2(0.0, t.y)));
+          float sField = sC * 1.15;
+          sField += sL * smoothstep(1.5, 0.0, length(f - vec2(-0.42, 0.5)));
+          sField += sR * smoothstep(1.5, 0.0, length(f - vec2(1.42, 0.5)));
+          sField += sU * smoothstep(1.5, 0.0, length(f - vec2(0.5, -0.42)));
+          sField += sD * smoothstep(1.5, 0.0, length(f - vec2(0.5, 1.42)));
+          float solidCov = clamp(smoothstep(0.4, 1.0, sField), 0.0, 1.0);
+          float emptyHereE = 1.0 - step(0.5, abs(id - uEmptyId));
+          vec2 sDir = vec2(sR - sL, sU - sD);                 // points empty -> solid (vUv space)
+          vec3 edgeCol = texture2D(uScene, vUv + sDir * 0.6 * t).rgb;
+          c = mix(c, edgeCol, emptyHereE * solidCov);
+
           // Faux depth: ambient occlusion toward the tank glass (canvas edges)
           // and floor, so the contents read as sitting inside a 3D tank.
           float aoX = min(smoothstep(0.0, 0.09, vUv.x), smoothstep(0.0, 0.09, 1.0 - vUv.x));
@@ -520,11 +541,10 @@ export class WebGL2Renderer implements Renderer {
           float emptyHere = 1.0 - step(0.5, abs(id - uEmptyId));
           float fireHere = 1.0 - step(0.5, abs(id - uFireId));
           float steamHere = 1.0 - step(0.5, abs(id - uSteamId));
-          float solidHere = isSolid(id);
           float waterHere = isWater(id);
 
           float outA = 0.0;
-          outA = max(outA, solidHere);
+          outA = max(outA, solidCov);   // anti-aliased solid silhouette
           outA = max(outA, fireHere);
           outA = max(outA, steamHere * 0.82);
           // water cells + metaball spill onto neighbouring empty cells

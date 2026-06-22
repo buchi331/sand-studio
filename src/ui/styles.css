@@ -135,15 +135,15 @@ body {
   content: none;
 }
 
-/* Canvas placed over the photographed tank interior (measured from the image:
-   inner glass walls x≈30%..70%, floor ≈74%). width% == height% keeps the 9:16
-   grid undistorted (the image is 9:16 too); bottom rests on the floor. */
+/* Canvas placed over the photographed tank interior (calibrated from rendered
+   content: inner glass walls x≈26.5%..70.6%, floor ≈74%). width% == height%
+   keeps the 9:16 grid undistorted (the image is 9:16 too). */
 .tank-shell {
   position: absolute;
-  left: 30%;
-  top: 34%;
-  width: 40%;
-  height: 40%;
+  left: 26%;
+  top: 29%;
+  width: 45%;
+  height: 45%;
 }
 
 .tank-shell::before {
