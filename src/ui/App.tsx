@@ -55,6 +55,15 @@ export function App() {
     rendererRef.current = renderer
     recorderRef.current = new CanvasRecorder()
 
+    if (import.meta.env.DEV) {
+      // Dev-only hook so the renderer can be driven manually (e.g. headless
+      // environments where requestAnimationFrame does not fire).
+      ;(window as unknown as Record<string, unknown>).__sand = {
+        render: () => renderer.render(sim),
+        sim
+      }
+    }
+
     const applyResize = () => {
       const dpr = window.devicePixelRatio || 1
       renderer.resize(canvas.clientWidth * dpr, canvas.clientHeight * dpr, dpr)

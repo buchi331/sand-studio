@@ -1,4 +1,5 @@
 import { Canvas2DRenderer } from './Canvas2DRenderer'
+import { WebGL2Renderer } from './WebGL2Renderer'
 import type { Renderer } from './Renderer'
 
 export type RendererBackend = 'webgl2' | 'canvas2d'
@@ -20,9 +21,16 @@ export function isWebGL2Available(): boolean {
 }
 
 /**
- * Pick the best available renderer. WebGL2 is wired in Phase ③; until then this
- * always returns the Canvas2D renderer.
+ * Pick the best available renderer: WebGL2 (with bloom) when supported,
+ * otherwise the Canvas2D fallback.
  */
 export function createRenderer(): RendererHandle {
+  if (isWebGL2Available()) {
+    try {
+      return { renderer: new WebGL2Renderer(), backend: 'webgl2' }
+    } catch {
+      // construction failed — fall back to Canvas2D
+    }
+  }
   return { renderer: new Canvas2DRenderer(), backend: 'canvas2d' }
 }
