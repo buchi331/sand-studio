@@ -52,14 +52,55 @@ export class WebGL2Renderer implements Renderer {
   private bright: REGL.Framebuffer2D | null = null
   private blurA: REGL.Framebuffer2D | null = null
   private blurB: REGL.Framebuffer2D | null = null
+  private full: REGL.Framebuffer2D | null = null
+  private hasBg = false
+  /** Tank-interior rectangle as a fraction of the room photo: [u0, v0, du, dv]. */
+  private bgRect: [number, number, number, number] = [0, 0, 1, 1]
   private drawScene: DrawFn | null = null
   private drawBright: DrawFn | null = null
   private drawBlur: DrawFn | null = null
   private drawComposite: DrawFn | null = null
+  private drawPresent: DrawFn | null = null
   private dw = 0
   private dh = 0
   private bw = 0
   private bh = 0
+  private fw = 0
+  private fh = 0
+
+  /**
+   * Supersample dimensions for the composite pass: up to 2x the display, capped
+   * at 1440px on the longest side so mobile GPUs stay within budget. The
+   * composite renders here then downsamples to screen — antialiasing the whole
+   * silhouette and every effect edge without touching the (deterministic) sim.
+   */
+  private ssDims(w: number, h: number): readonly [number, number] {
+    const ss = Math.max(1, Math.min(2, 1440 / w, 1440 / h))
+    return [Math.max(1, Math.round(w * ss)), Math.max(1, Math.round(h * ss))]
+  }
+
+  /**
+   * Find where the canvas sits inside the room photo, as UV fractions, by
+   * walking up to the nearest ancestor that paints the background image and
+   * comparing bounding boxes. Reads live layout so it tracks whatever CSS places
+   * the tank — no hard-coded percentages. Called on resize (post-layout).
+   */
+  private updateBgRect(): void {
+    const canvas = this.canvas
+    if (!canvas || typeof getComputedStyle !== 'function') return
+    let el: HTMLElement | null = canvas.parentElement
+    while (el && getComputedStyle(el).backgroundImage === 'none') el = el.parentElement
+    if (!el) return
+    const cr = canvas.getBoundingClientRect()
+    const rr = el.getBoundingClientRect()
+    if (rr.width < 1 || rr.height < 1) return
+    this.bgRect = [
+      (cr.left - rr.left) / rr.width,
+      (cr.top - rr.top) / rr.height,
+      cr.width / rr.width,
+      cr.height / rr.height
+    ]
+  }
 
   init(canvas: HTMLCanvasElement, width: number, height: number): void {
     const gl = canvas.getContext('webgl2', {
@@ -120,6 +161,29 @@ export class WebGL2Renderer implements Renderer {
       data: paletteData()
     })
 
+    // Room photo as a texture so the water can refract the background behind the
+    // tank. Starts as a 1x1 placeholder; the real image streams in async. Loading
+    // a same-origin image keeps the canvas untainted, so recording still works.
+    const bgTex = regl.texture({
+      width: 1,
+      height: 1,
+      data: [10, 10, 18, 255],
+      mag: 'linear',
+      min: 'linear',
+      wrapS: 'clamp',
+      wrapT: 'clamp'
+    })
+    const bgImg = new Image()
+    bgImg.onload = () => {
+      try {
+        bgTex({ data: bgImg, flipY: true, mag: 'linear', min: 'linear', wrapS: 'clamp', wrapT: 'clamp' })
+        this.hasBg = true
+      } catch {
+        // texture upload failed (e.g. context lost) — stay on the placeholder
+      }
+    }
+    bgImg.src = `${import.meta.env.BASE_URL}room-aquarium-bg.png`
+
     const makeFbo = (w: number, h: number) =>
       regl.framebuffer({
         color: regl.texture({ width: w, height: h, type: fboType, mag: 'linear', min: 'linear' }),
@@ -133,6 +197,17 @@ export class WebGL2Renderer implements Renderer {
     this.bright = bright
     this.blurA = blurA
     this.blurB = blurB
+
+    // Supersampled target for the final composite (LDR uint8, premultiplied
+    // alpha). Linear filtering lets the present pass downsample it to the screen.
+    const [fw0, fh0] = this.ssDims(this.dw, this.dh)
+    this.fw = fw0
+    this.fh = fh0
+    const full = regl.framebuffer({
+      color: regl.texture({ width: fw0, height: fh0, type: 'uint8', format: 'rgba', mag: 'linear', min: 'linear' }),
+      depth: false
+    })
+    this.full = full
 
     const position = regl.buffer(QUAD)
     const base = {
@@ -385,8 +460,8 @@ export class WebGL2Renderer implements Renderer {
 
     this.drawComposite = regl({
       ...base,
-      framebuffer: null, // render to the screen (blur passes leave an FBO bound)
-      viewport: () => ({ x: 0, y: 0, width: this.dw, height: this.dh }),
+      framebuffer: full, // render into the supersampled buffer, then downsample
+      viewport: () => ({ x: 0, y: 0, width: this.fw, height: this.fh }),
       uniforms: {
         uScene: scene,
         uBloom: blurB,
@@ -402,13 +477,18 @@ export class WebGL2Renderer implements Renderer {
         uFireId: Material.Fire,
         uSteamId: Material.Steam,
         uTime: regl.prop<{ uTime: number }, 'uTime'>('uTime'),
-        uIntensity: 2.5
+        uIntensity: 2.5,
+        uBg: bgTex,
+        uBgRect: () => this.bgRect,
+        uHasBg: () => (this.hasBg ? 1 : 0)
       },
       vert: VERT,
       frag: `
         precision highp float;
         varying vec2 vUv;
-        uniform sampler2D uScene, uBloom, uGrid, uPalette;
+        uniform sampler2D uScene, uBloom, uGrid, uPalette, uBg;
+        uniform vec4 uBgRect;
+        uniform float uHasBg;
         uniform vec2 uGridSize;
         uniform float uWaterId, uSandId, uStoneId, uWallId, uPlantId, uTime, uIntensity;
         uniform float uEmptyId, uFireId, uSteamId;
@@ -476,6 +556,22 @@ export class WebGL2Renderer implements Renderer {
           // warm reflection of the room's window light (upper-left) on the surface
           float winSide = smoothstep(0.75, 0.0, vUv.x);
           water += vec3(0.55, 0.48, 0.34) * surfaceLine * winSide;
+
+          // Refraction: the water body bends the room photo behind the tank. Faint
+          // over the body (the photographed interior is dark), stronger toward the
+          // glass walls where you really see through to the room. uHasBg gates it
+          // so before the photo streams in this is a no-op.
+          float fTop = uBgRect.y + (1.0 - vUv.y) * uBgRect.w;
+          vec2 bgUv = vec2(uBgRect.x + vUv.x * uBgRect.z, 1.0 - fTop);
+          float wob = sin(p.y * 0.5 + uTime * 1.8) + sin(p.x * 0.42 - uTime * 1.3);
+          vec2 refrOff = vec2(wob, wob * 0.6) * t * 1.6;
+          float wallSee = max(smoothstep(0.12, 0.0, vUv.x), smoothstep(0.88, 1.0, vUv.x));
+          vec3 refr = texture2D(uBg, clamp(bgUv + refrOff, 0.0, 1.0)).rgb;
+          float refrAmt = uHasBg * (0.16 + wallSee * 0.34) * (1.0 - depth * 0.55);
+          water = mix(water, water * 0.55 + refr * 0.75, refrAmt);
+          // glass meniscus: water climbs the tank walls in a bright thin line
+          float wallProx = max(smoothstep(0.05, 0.0, vUv.x), smoothstep(0.95, 1.0, vUv.x));
+          water += vec3(0.5, 0.72, 0.78) * wallProx * mask * 0.22;
 
           // Blend the water body over the scene; shallow water stays translucent
           // so the wet sand beneath reads through, deep water turns opaque teal.
@@ -568,6 +664,22 @@ export class WebGL2Renderer implements Renderer {
         }
       `
     }) as unknown as DrawFn
+
+    // Present: downsample the supersampled composite to the screen. Linear
+    // filtering of the premultiplied-alpha buffer is the antialiasing resolve.
+    this.drawPresent = regl({
+      ...base,
+      framebuffer: null,
+      viewport: () => ({ x: 0, y: 0, width: this.dw, height: this.dh }),
+      uniforms: { uFull: full },
+      vert: VERT,
+      frag: `
+        precision mediump float;
+        varying vec2 vUv;
+        uniform sampler2D uFull;
+        void main(){ gl_FragColor = texture2D(uFull, vUv); }
+      `
+    }) as unknown as DrawFn
   }
 
   resize(displayWidth: number, displayHeight: number): void {
@@ -584,10 +696,15 @@ export class WebGL2Renderer implements Renderer {
       this.canvas.width = w
       this.canvas.height = h
     }
+    const [fw, fh] = this.ssDims(w, h)
+    this.fw = fw
+    this.fh = fh
+    this.updateBgRect()
     this.scene?.resize(w, h)
     this.bright?.resize(this.bw, this.bh)
     this.blurA?.resize(this.bw, this.bh)
     this.blurB?.resize(this.bw, this.bh)
+    this.full?.resize(fw, fh)
   }
 
   render(grid: GridView, elapsedSeconds = 0): void {
@@ -622,6 +739,7 @@ export class WebGL2Renderer implements Renderer {
     this.drawBlur?.({ src: this.bright, dst: this.blurA, dir: [1, 0] })
     this.drawBlur?.({ src: this.blurA, dst: this.blurB, dir: [0, 1] })
     this.drawComposite?.({ uTime: elapsedSeconds })
+    this.drawPresent?.({})
   }
 
   dispose(): void {

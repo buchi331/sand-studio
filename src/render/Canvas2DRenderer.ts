@@ -41,7 +41,7 @@ export class Canvas2DRenderer implements Renderer {
   // Canvas2D renders at grid resolution and is CSS-scaled, so display size is irrelevant.
   resize(): void {}
 
-  render(grid: GridView): void {
+  render(grid: GridView, elapsedSeconds = 0): void {
     const ctx = this.ctx
     const image = this.image
     const buf = this.buffer
@@ -112,6 +112,26 @@ export class Canvas2DRenderer implements Renderer {
           g = clamp8(g * k + 4)
           b = clamp8(b * k + 12)
         }
+        // caustics: a shifting light network on solids directly under water
+        if (submerged) {
+          const x = i % w
+          const y = (i / w) | 0
+          const ca =
+            Math.sin((x + y * 0.6) * 0.5 + elapsedSeconds * 2.0) +
+            Math.sin((x * -0.4 + y) * 0.72 - elapsedSeconds * 1.6)
+          const caustic = Math.max(0, Math.min(1, ca - 0.9))
+          r = clamp8(r + caustic * 16)
+          g = clamp8(g + caustic * 26)
+          b = clamp8(b + caustic * 22)
+        }
+      }
+
+      // Colour grade: warm the whole picture toward the room-photo tone so the
+      // Canvas2D fallback sits in the same light as the WebGL2 path.
+      if (m !== Material.Empty) {
+        r = clamp8(r * 1.045 + 3)
+        g = clamp8(g + 1.5)
+        b = clamp8(b * 0.95)
       }
 
       const o = i << 2
