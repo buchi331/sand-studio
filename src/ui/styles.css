@@ -112,6 +112,7 @@ body {
   min-height: 0;
   padding: 8px 4px;
   position: relative;
+  overflow: hidden;
 }
 
 /* The room photo, locked to its own aspect ratio. The canvas is positioned
@@ -124,6 +125,10 @@ body {
   aspect-ratio: 941 / 1672;
   margin: 0 auto;
   background: url('/room-aquarium-bg.png') center / contain no-repeat;
+  /* Zoom into the tank on wide/desktop screens (the stage clips the overflow);
+     the tank-shell scales with it so alignment is preserved. */
+  transform: scale(1.32);
+  transform-origin: center 46%;
 }
 
 .stage::before {
