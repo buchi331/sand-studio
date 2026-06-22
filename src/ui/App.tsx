@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Simulation } from '../sim/simulation'
 import { Material } from '../sim/materials'
-import { Canvas2DRenderer } from '../render/Canvas2DRenderer'
+import { createRenderer } from '../render/createRenderer'
+import type { Renderer } from '../render/Renderer'
 import { CanvasRecorder, shareVideo } from '../capture/recorder'
 import { Palette } from './Palette'
 import { Toolbar } from './Toolbar'
@@ -17,7 +18,7 @@ interface Point {
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<Simulation | null>(null)
-  const rendererRef = useRef<Canvas2DRenderer | null>(null)
+  const rendererRef = useRef<Renderer | null>(null)
   const recorderRef = useRef<CanvasRecorder | null>(null)
 
   const [tool, setTool] = useState<number>(Material.Sand)
@@ -48,11 +49,19 @@ export function App() {
 
     const seed = (Date.now() >>> 0) || 1
     const sim = new Simulation({ width: GRID_W, height: GRID_H, seed })
-    const renderer = new Canvas2DRenderer()
+    const { renderer } = createRenderer()
     renderer.init(canvas, GRID_W, GRID_H)
     simRef.current = sim
     rendererRef.current = renderer
     recorderRef.current = new CanvasRecorder()
+
+    const applyResize = () => {
+      const dpr = window.devicePixelRatio || 1
+      renderer.resize(canvas.clientWidth * dpr, canvas.clientHeight * dpr, dpr)
+    }
+    applyResize()
+    const ro = new ResizeObserver(applyResize)
+    ro.observe(canvas)
 
     let raf = 0
     const loop = () => {
@@ -64,6 +73,7 @@ export function App() {
 
     return () => {
       cancelAnimationFrame(raf)
+      ro.disconnect()
       renderer.dispose()
     }
   }, [])
