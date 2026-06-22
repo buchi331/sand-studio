@@ -239,6 +239,7 @@ export class WebGL2Renderer implements Renderer {
         uPlantId: Material.Plant,
         uStoneId: Material.Stone,
         uSteamId: Material.Steam,
+        uOilId: Material.Oil,
         uTime: regl.prop<{ uTime: number }, 'uTime'>('uTime')
       },
       vert: VERT,
@@ -247,7 +248,7 @@ export class WebGL2Renderer implements Renderer {
         varying vec2 vUv;
         uniform sampler2D uGrid, uPalette;
         uniform vec2 uGridSize;
-        uniform float uFireLife, uSteamLife, uFireId, uWaterId, uEmptyId, uWallId, uSandId, uPlantId, uStoneId, uSteamId;
+        uniform float uFireLife, uSteamLife, uFireId, uWaterId, uEmptyId, uWallId, uSandId, uPlantId, uStoneId, uSteamId, uOilId;
         uniform float uTime;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float cellId(vec2 uv) {
@@ -255,6 +256,15 @@ export class WebGL2Renderer implements Renderer {
         }
         float isWater(float id) { return 1.0 - step(0.5, abs(id - uWaterId)); }
         float isEmpty(float id) { return 1.0 - step(0.5, abs(id - uEmptyId)); }
+        // Solid "body" materials (sand/stone/wall/plant/oil) — the height-field
+        // the 2.5D lighting derives surface normals from.
+        float bodyAt(vec2 uv) {
+          float i = cellId(uv);
+          return step(0.5, i)
+               * step(0.5, abs(i - uWaterId))
+               * step(0.5, abs(i - uFireId))
+               * step(0.5, abs(i - uSteamId));
+        }
         float isFoamSolid(float id) {
           float solid = 0.0;
           solid = max(solid, 1.0 - step(0.5, abs(id - uWallId)));
@@ -391,21 +401,51 @@ export class WebGL2Renderer implements Renderer {
             float foam = edgeSolid * (solidUnder * 0.86 + sideEdge * 0.08) * foamNoise * 0.18 * coverage;
             col = mix(col, vec3(0.86, 0.94, 0.98), foam);
           } else if (id > 0.5 && abs(id - uWaterId) > 0.5) {
-            // faux volume: lit from above — exposed (surface) cells brighter,
-            // buried cells slightly darker, so piles read as 3D mounds.
-            float aboveSame = 1.0 - step(0.5, abs(cellId(uv - vec2(0.0, texel.y)) - id));
-            float belowSame = 1.0 - step(0.5, abs(cellId(uv + vec2(0.0, texel.y)) - id));
-            col *= 1.0 + (1.0 - aboveSame) * 0.20 - belowSame * 0.05;
-            col += (hash(c) * 2.0 - 1.0) * pal.a;              // per-material grain
-            // wet: solids touching water turn darker, richer and slightly cool —
-            // sand/stone that has soaked up water reads as believably damp.
+            // 2.5D lighting: treat the material field as a height-field. Build a
+            // surface normal from neighbour occupancy (mound shape) + sub-cell
+            // position (round each cell) + per-grain micro-bumps (granularity),
+            // then light it from the photo's warm window (upper-left-front). Flat
+            // piles become lit 3D mounds; oil reads glossy, sand matte/granular.
+            vec3 albedo = col;
+            // wet albedo: sand/stone soaked by water reads damp (darker, cooler).
             float submerged = isWater(aboveId);
             float touchWater = max(max(isWater(belowId), submerged), max(leftWater, rightWater));
             float wetAmt = clamp(touchWater * 0.6 + submerged * 0.45, 0.0, 1.0);
-            vec3 wetCol = col * 0.6;
-            wetCol = mix(vec3(dot(wetCol, vec3(0.33, 0.5, 0.17))), wetCol, 1.22); // saturate
-            wetCol += vec3(0.0, 0.012, 0.03) * submerged;                          // cool tint
-            col = mix(col, wetCol, wetAmt);
+            vec3 wetCol = albedo * 0.6;
+            wetCol = mix(vec3(dot(wetCol, vec3(0.33, 0.5, 0.17))), wetCol, 1.22);
+            wetCol += vec3(0.0, 0.012, 0.03) * submerged;
+            albedo = mix(albedo, wetCol, wetAmt);
+
+            float bl = bodyAt(uv - vec2(texel.x, 0.0));
+            float br = bodyAt(uv + vec2(texel.x, 0.0));
+            float bu = bodyAt(uv - vec2(0.0, texel.y));
+            float bd = bodyAt(uv + vec2(0.0, texel.y));
+            vec2 sub = (inCell - 0.5) * 2.0;
+            vec2 macro = vec2(bl - br, bu - bd);                 // mound slope from mass
+            vec2 edgeTilt = vec2(
+              (1.0 - br) * max(sub.x, 0.0) - (1.0 - bl) * max(-sub.x, 0.0),
+              (1.0 - bd) * max(sub.y, 0.0) - (1.0 - bu) * max(-sub.y, 0.0)
+            );                                                   // round each cell at exposed edges
+            float h0 = hash(c);
+            vec2 micro = (vec2(hash(c + vec2(1.7, 0.0)), hash(c + vec2(0.0, 1.7))) - h0) * pal.a * 3.5;
+            vec3 N = normalize(vec3(macro * 1.15 + edgeTilt * 0.8 + micro, 1.0));
+            vec3 L = normalize(vec3(-0.45, -0.55, 0.72));        // warm window, upper-left-front
+            float diff = max(dot(N, L), 0.0);
+            vec3 Hh = normalize(L + vec3(0.0, 0.0, 1.0));
+            float gloss = clamp((1.0 - step(0.5, abs(id - uOilId))) + (1.0 - step(0.5, abs(id - uStoneId))) * 0.3, 0.0, 1.0);
+            float spec = pow(max(dot(N, Hh), 0.0), mix(12.0, 70.0, gloss)) * mix(0.08, 0.5, gloss);
+            // volumetric top-light: brightness fades with depth below the top
+            // surface, so the whole pile rounds into a 3D mound, not a lit skin.
+            float depthBelow = (
+              bodyAt(uv - vec2(0.0, texel.y)) + bodyAt(uv - vec2(0.0, texel.y * 2.0)) +
+              bodyAt(uv - vec2(0.0, texel.y * 3.0)) + bodyAt(uv - vec2(0.0, texel.y * 4.0)) +
+              bodyAt(uv - vec2(0.0, texel.y * 5.0))
+            ) * 0.2;
+            float occ = (bl + br + bu + bd) * 0.25;              // buried cells are occluded
+            vec3 lightCol = vec3(1.0, 0.92, 0.78);
+            vec3 ambient = vec3(0.36, 0.38, 0.44);
+            vec3 lit = albedo * (ambient + lightCol * diff * 1.0) + lightCol * spec;
+            col = lit * mix(1.0, 0.55, depthBelow) * mix(1.0, 0.88, occ);
           }
           gl_FragColor = vec4(col, 1.0);
         }
