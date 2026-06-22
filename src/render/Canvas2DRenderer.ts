@@ -95,6 +95,23 @@ export class Canvas2DRenderer implements Renderer {
           g = clamp8(g + d)
           b = clamp8(b + d)
         }
+        // wet: solids touching water darken, deepen and cool slightly (damp look)
+        const below = i + w
+        const above = i - w
+        const left = i % w === 0 ? -1 : i - 1
+        const right = i % w === w - 1 ? -1 : i + 1
+        const submerged = above >= 0 && cells[above] === Material.Water
+        const wet =
+          submerged ||
+          (below < cells.length && cells[below] === Material.Water) ||
+          (left >= 0 && cells[left] === Material.Water) ||
+          (right >= 0 && cells[right] === Material.Water)
+        if (wet) {
+          const k = submerged ? 0.62 : 0.74
+          r = clamp8(r * k)
+          g = clamp8(g * k + 4)
+          b = clamp8(b * k + 12)
+        }
       }
 
       const o = i << 2

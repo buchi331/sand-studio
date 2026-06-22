@@ -317,6 +317,15 @@ export class WebGL2Renderer implements Renderer {
             float belowSame = 1.0 - step(0.5, abs(cellId(uv + vec2(0.0, texel.y)) - id));
             col *= 1.0 + (1.0 - aboveSame) * 0.20 - belowSame * 0.05;
             col += (hash(c) * 2.0 - 1.0) * pal.a;              // per-material grain
+            // wet: solids touching water turn darker, richer and slightly cool —
+            // sand/stone that has soaked up water reads as believably damp.
+            float submerged = isWater(aboveId);
+            float touchWater = max(max(isWater(belowId), submerged), max(leftWater, rightWater));
+            float wetAmt = clamp(touchWater * 0.6 + submerged * 0.45, 0.0, 1.0);
+            vec3 wetCol = col * 0.6;
+            wetCol = mix(vec3(dot(wetCol, vec3(0.33, 0.5, 0.17))), wetCol, 1.22); // saturate
+            wetCol += vec3(0.0, 0.012, 0.03) * submerged;                          // cool tint
+            col = mix(col, wetCol, wetAmt);
           }
           gl_FragColor = vec4(col, 1.0);
         }
@@ -407,6 +416,7 @@ export class WebGL2Renderer implements Renderer {
           return floor(texture2D(uGrid, uv).r * 255.0 + 0.5);
         }
         float isWater(float id) { return 1.0 - step(0.5, abs(id - uWaterId)); }
+        float isFire(float id) { return 1.0 - step(0.5, abs(id - uFireId)); }
         float isSolid(float id) {
           float solid = 0.0;
           solid = max(solid, 1.0 - step(0.5, abs(id - uSandId)));
@@ -466,11 +476,44 @@ export class WebGL2Renderer implements Renderer {
           waterMix = max(waterMix, surfaceLine * 0.4);
           c = mix(c, water, waterMix);
 
+          // Caustics: a shifting bright network on solids that sit under water.
+          float solidHereC = isSolid(id);
+          float waterAbove = isWater(cellId(guv - vec2(0.0, t.y)));
+          float ca = sin((p.x + p.y * 0.6) * 0.5 + uTime * 2.0);
+          float cb = sin((p.x * -0.4 + p.y) * 0.72 - uTime * 1.6);
+          float caustic = smoothstep(0.9, 1.85, ca + cb) * solidHereC * waterAbove;
+          c += vec3(0.10, 0.17, 0.13) * caustic;
+
+          // Contact / drop shadow: solids occluded from the upper-left read darker,
+          // giving piles sculpted, directional form (light from the top-left).
+          float occl = isSolid(cellId(guv + vec2(-t.x, -t.y))) * 0.6
+                     + isSolid(cellId(guv + vec2(0.0, -t.y))) * 0.5
+                     + isSolid(cellId(guv + vec2(-t.x * 2.0, -t.y * 2.0))) * 0.3;
+          c *= 1.0 - solidHereC * clamp(occl, 0.0, 1.0) * 0.14;
+
+          // Smoke: faint rising haze above flames — pure noise, no particles/state.
+          float fireBelow = isFire(cellId(guv + vec2(0.0, t.y * 2.0)))
+                          + isFire(cellId(guv + vec2(0.0, t.y * 5.0))) * 0.7
+                          + isFire(cellId(guv + vec2(t.x, t.y * 3.5))) * 0.5
+                          + isFire(cellId(guv - vec2(t.x, t.y * 3.5))) * 0.5;
+          float smokeNoise = 0.5 + 0.5 * sin(p.x * 0.35 - uTime * 3.2) * sin(p.y * 0.21 + uTime * 1.7);
+          float emptyHereS = 1.0 - step(0.5, abs(id - uEmptyId));
+          float smoke = clamp(fireBelow, 0.0, 1.0) * smokeNoise * emptyHereS * 0.5;
+          c += vec3(0.05, 0.045, 0.04) * smoke;
+
           // Faux depth: ambient occlusion toward the tank glass (canvas edges)
           // and floor, so the contents read as sitting inside a 3D tank.
           float aoX = min(smoothstep(0.0, 0.09, vUv.x), smoothstep(0.0, 0.09, 1.0 - vUv.x));
           float aoFloor = smoothstep(0.0, 0.10, vUv.y);
           c *= mix(0.80, 1.0, aoX) * mix(0.86, 1.0, aoFloor);
+
+          // Colour grade: nudge toward the warm room-photo tone + a gentle vignette
+          // so the tank contents sit in the same light as the photograph.
+          c = pow(max(c, 0.0), vec3(0.95));
+          c *= vec3(1.045, 1.0, 0.95);
+          c += vec3(0.012, 0.006, 0.0);
+          float vig = smoothstep(1.05, 0.32, length(vUv - 0.5));
+          c *= mix(0.9, 1.0, vig);
 
           // Per-pixel opacity: empty cells stay transparent so the photo tank
           // shows through; materials/water/glow become visible "inside" it.
@@ -490,6 +533,8 @@ export class WebGL2Renderer implements Renderer {
           // keep the bloom glow visible over the transparent background
           float bloomA = clamp(dot(texture2D(uBloom, vUv).rgb * uIntensity, vec3(0.34)), 0.0, 1.0);
           outA = max(outA, bloomA);
+          // smoke haze is faintly opaque so it reads over the photo background
+          outA = max(outA, smoke * 0.45);
 
           outA = clamp(outA, 0.0, 1.0);
           gl_FragColor = vec4(c * outA, outA); // premultiplied alpha
