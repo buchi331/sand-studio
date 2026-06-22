@@ -55,3 +55,16 @@ export const COLORS: ReadonlyArray<readonly [number, number, number]> = [
   [154, 160, 166], // Stone
   [205, 213, 224] // Steam
 ]
+
+/** Per-liquid flow tuning. Water is runny; oil is viscous. */
+export interface LiquidParams {
+  /** How far it searches sideways for a lower resting spot each step. */
+  dispersion: number
+  /** Per-step probability it is allowed to move sideways at all. */
+  flowChance: number
+}
+
+export const LIQUID_PARAMS: Partial<Record<MaterialId, LiquidParams>> = {
+  [Material.Water]: { dispersion: 6, flowChance: 1.0 },
+  [Material.Oil]: { dispersion: 2, flowChance: 0.4 }
+}

@@ -1,4 +1,4 @@
-import { Material } from './materials'
+import { Material, LIQUID_PARAMS } from './materials'
 import { makeRng, type Rng } from './rng'
 
 export interface SimulationOptions {
@@ -20,8 +20,6 @@ const FIRE_SPREAD = 0.28
 const FIRE_RISE = 0.25
 /** Per-step chance a plant grows into an adjacent water cell. */
 const PLANT_GROW = 0.04
-/** How far a liquid searches sideways for a lower resting spot each step. */
-const LIQUID_DISPERSION = 5
 
 const NEIGHBORS8: ReadonlyArray<readonly [number, number]> = [
   [-1, -1],
@@ -223,15 +221,24 @@ export class Simulation {
         return
       }
     }
-    // Settle sideways toward the farthest reachable empty cell to form a level.
+    // Sideways flow, modulated by per-liquid viscosity.
+    const params = LIQUID_PARAMS[m as keyof typeof LIQUID_PARAMS]
+    const dispersion = params ? params.dispersion : 4
+    if (params && this.rng() >= params.flowChance) return // too viscous this step
     const hdir = this.rng() < 0.5 ? -1 : 1
-    if (this.flowSideways(x, y, idx, hdir)) return
-    this.flowSideways(x, y, idx, -hdir)
+    if (this.flowSideways(x, y, idx, hdir, dispersion)) return
+    this.flowSideways(x, y, idx, -hdir, dispersion)
   }
 
-  private flowSideways(x: number, y: number, idx: number, dir: number): boolean {
+  private flowSideways(
+    x: number,
+    y: number,
+    idx: number,
+    dir: number,
+    dispersion: number
+  ): boolean {
     let target = -1
-    for (let s = 1; s <= LIQUID_DISPERSION; s++) {
+    for (let s = 1; s <= dispersion; s++) {
       const nx = x + dir * s
       if (this.cellAt(nx, y) !== Material.Empty) break
       target = nx

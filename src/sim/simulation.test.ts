@@ -115,6 +115,29 @@ describe('Liquid physics', () => {
     expect(sim.get(0, 3)).toBe(Material.Oil)
     expect(sim.get(0, 4)).toBe(Material.Water)
   })
+
+  it('water spreads wider than oil (viscosity)', () => {
+    // Measure horizontal extent mid-flow: runny water reaches farther from the
+    // source than viscous oil. (Both eventually settle to the same puddle once
+    // they equilibrate, so we compare during the transient.)
+    const extent = (mat: number) => {
+      const sim = new Simulation({ width: 31, height: 21, seed: 123 })
+      for (let y = 0; y < 10; y++) sim.set(15, y, mat)
+      for (let i = 0; i < 20; i++) sim.step()
+      let minX = 99
+      let maxX = -1
+      for (let x = 0; x < 31; x++) {
+        for (let y = 0; y < 21; y++) {
+          if (sim.get(x, y) === mat) {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+          }
+        }
+      }
+      return maxX - minX + 1
+    }
+    expect(extent(Material.Water)).toBeGreaterThan(extent(Material.Oil))
+  })
 })
 
 describe('Reactions', () => {
