@@ -130,15 +130,15 @@ body {
   content: none;
 }
 
-/* Canvas placed over the photographed tank interior (measured from the image:
-   inner walls x≈31%..73%, floor y≈80%). Bottom-aligned so contents rest on the
-   tank floor; height keeps the 9:16 grid aspect → headroom near the rim. */
+/* Canvas placed over the photographed tank interior (calibrated from a live
+   screenshot: inner walls x≈23%..75%, opening y≈26%, glass floor y≈72%).
+   Fills the tank so contents rest on the floor and span the glass. */
 .tank-shell {
   position: absolute;
-  left: 31%;
-  top: 38%;
-  width: 42%;
-  height: 42%;
+  left: 23%;
+  top: 26%;
+  width: 52%;
+  height: 46%;
 }
 
 .tank-shell::before {
